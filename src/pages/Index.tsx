@@ -5,6 +5,7 @@ import { MathInput } from "@/components/MathInput";
 import { SolutionDisplay } from "@/components/SolutionDisplay";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { solveMathProblem } from "@/lib/mathSolver";
+import { toast } from "sonner";
 import { 
   Calculator, 
   Shapes, 
@@ -92,8 +93,11 @@ export default function Index() {
         category: categories.find((c) => c.id === selectedCategory)?.title || "",
       };
       setHistory((prev) => [newHistoryItem, ...prev]);
+      
+      toast.success("Problème résolu avec succès !");
     } catch (error) {
       console.error("Error solving problem:", error);
+      toast.error(error instanceof Error ? error.message : "Erreur lors de la résolution");
     } finally {
       setIsLoading(false);
     }
@@ -113,15 +117,15 @@ export default function Index() {
         <section className="text-center mb-12 animate-fade-in">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
             <BrainCircuit className="w-4 h-4" />
-            Résolution intelligente
+            Résolution par IA
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
             <span className="gradient-text">Résolvez</span> vos problèmes
             <br />mathématiques
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Entrez votre problème et obtenez une solution détaillée étape par étape.
-            De l'algèbre au calcul intégral.
+            Entrez votre problème et obtenez une solution détaillée étape par étape
+            grâce à l'intelligence artificielle.
           </p>
         </section>
 
