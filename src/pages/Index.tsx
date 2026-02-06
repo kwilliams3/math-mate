@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { CategoryCard } from "@/components/CategoryCard";
 import { MathInput } from "@/components/MathInput";
 import { SolutionDisplay } from "@/components/SolutionDisplay";
 import { HistoryPanel } from "@/components/HistoryPanel";
+import { AuthModal } from "@/components/AuthModal";
 import { solveMathProblem } from "@/lib/mathSolver";
+import { saveToHistory, getHistory, deleteHistoryItem, HistoryItem } from "@/lib/historyService";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { 
   Calculator, 
@@ -14,14 +17,6 @@ import {
   Sigma,
   BrainCircuit 
 } from "lucide-react";
-
-interface HistoryItem {
-  id: string;
-  problem: string;
-  answer: string;
-  timestamp: Date;
-  category: string;
-}
 
 interface Solution {
   steps: { title: string; content: string; formula?: string }[];
@@ -62,10 +57,31 @@ const categories = [
 export default function Index() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentProblem, setCurrentProblem] = useState<string | null>(null);
   const [currentSolution, setCurrentSolution] = useState<Solution | null>(null);
+  
+  const { user, loading: authLoading } = useAuth();
+
+  // Load history when user changes
+  useEffect(() => {
+    if (user) {
+      loadHistory();
+    } else {
+      setHistory([]);
+    }
+  }, [user]);
+
+  const loadHistory = async () => {
+    try {
+      const data = await getHistory();
+      setHistory(data);
+    } catch (error) {
+      console.error("Failed to load history:", error);
+    }
+  };
 
   const handleCategorySelect = (categoryId: string) => {
     setSelectedCategory(categoryId);
@@ -84,15 +100,16 @@ export default function Index() {
       const solution = await solveMathProblem(problem, selectedCategory, image);
       setCurrentSolution(solution);
 
-      // Add to history
-      const newHistoryItem: HistoryItem = {
-        id: Date.now().toString(),
-        problem,
-        answer: solution.finalAnswer,
-        timestamp: new Date(),
-        category: categories.find((c) => c.id === selectedCategory)?.title || "",
-      };
-      setHistory((prev) => [newHistoryItem, ...prev]);
+      // Save to database if user is logged in
+      if (user) {
+        const categoryTitle = categories.find((c) => c.id === selectedCategory)?.title || selectedCategory;
+        await saveToHistory(
+          image ? "📷 Problème depuis image" : problem,
+          solution.finalAnswer,
+          categoryTitle
+        );
+        await loadHistory();
+      }
       
       toast.success("Problème résolu avec succès !");
     } catch (error) {
@@ -105,12 +122,30 @@ export default function Index() {
 
   const handleHistorySelect = (item: HistoryItem) => {
     setIsHistoryOpen(false);
-    // Could implement restoring the solution from history
+    setCurrentProblem(item.problem);
+    // Find category by title
+    const category = categories.find(c => c.title === item.category);
+    if (category) {
+      setSelectedCategory(category.id);
+    }
+  };
+
+  const handleDeleteHistory = async (id: string) => {
+    try {
+      await deleteHistoryItem(id);
+      setHistory(prev => prev.filter(item => item.id !== id));
+      toast.success("Élément supprimé");
+    } catch (error) {
+      toast.error("Erreur lors de la suppression");
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onHistoryClick={() => setIsHistoryOpen(true)} />
+      <Header 
+        onHistoryClick={() => setIsHistoryOpen(true)} 
+        onAuthClick={() => setIsAuthOpen(true)}
+      />
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Hero Section */}
@@ -127,6 +162,18 @@ export default function Index() {
             Entrez votre problème et obtenez une solution détaillée étape par étape
             grâce à l'intelligence artificielle.
           </p>
+          
+          {!user && !authLoading && (
+            <p className="text-sm text-muted-foreground mt-4">
+              <button 
+                onClick={() => setIsAuthOpen(true)}
+                className="text-primary hover:underline"
+              >
+                Connectez-vous
+              </button>
+              {" "}pour sauvegarder votre historique
+            </p>
+          )}
         </section>
 
         {/* Categories */}
@@ -184,6 +231,13 @@ export default function Index() {
         onClose={() => setIsHistoryOpen(false)}
         history={history}
         onSelectItem={handleHistorySelect}
+        onDeleteItem={handleDeleteHistory}
+      />
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
       />
     </div>
   );
