@@ -1,8 +1,9 @@
 import { SolutionStep } from "./SolutionStep";
 import { Button } from "@/components/ui/button";
-import { Copy, Download, CheckCircle2 } from "lucide-react";
+import { Copy, Download, CheckCircle2, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
 
 interface Step {
   title: string;
@@ -18,6 +19,7 @@ interface SolutionDisplayProps {
 
 export function SolutionDisplay({ problem, steps, finalAnswer }: SolutionDisplayProps) {
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const handleCopy = () => {
     const text = `Problème: ${problem}\n\n${steps
@@ -28,6 +30,122 @@ export function SolutionDisplay({ problem, steps, finalAnswer }: SolutionDisplay
     setCopied(true);
     toast.success("Solution copiée !");
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownloadPDF = () => {
+    setDownloading(true);
+    
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 20;
+      const maxWidth = pageWidth - margin * 2;
+      let yPosition = 20;
+
+      // Title
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(99, 102, 241); // Primary color
+      doc.text("MathSolver", pageWidth / 2, yPosition, { align: "center" });
+      yPosition += 15;
+
+      // Subtitle
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 100, 100);
+      doc.text("Résolution étape par étape", pageWidth / 2, yPosition, { align: "center" });
+      yPosition += 20;
+
+      // Problem section
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("Problème", margin, yPosition);
+      yPosition += 8;
+
+      doc.setFontSize(12);
+      doc.setFont("courier", "normal");
+      const problemLines = doc.splitTextToSize(problem, maxWidth);
+      doc.text(problemLines, margin, yPosition);
+      yPosition += problemLines.length * 6 + 15;
+
+      // Steps
+      steps.forEach((step, index) => {
+        // Check if we need a new page
+        if (yPosition > 260) {
+          doc.addPage();
+          yPosition = 20;
+        }
+
+        doc.setFontSize(13);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(99, 102, 241);
+        doc.text(`Étape ${index + 1}: ${step.title}`, margin, yPosition);
+        yPosition += 8;
+
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(60, 60, 60);
+        const contentLines = doc.splitTextToSize(step.content, maxWidth);
+        doc.text(contentLines, margin, yPosition);
+        yPosition += contentLines.length * 5 + 5;
+
+        if (step.formula) {
+          doc.setFont("courier", "normal");
+          doc.setTextColor(0, 0, 0);
+          const formulaLines = doc.splitTextToSize(step.formula, maxWidth);
+          doc.text(formulaLines, margin, yPosition);
+          yPosition += formulaLines.length * 5 + 10;
+        } else {
+          yPosition += 5;
+        }
+      });
+
+      // Final answer box
+      if (yPosition > 240) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
+      yPosition += 10;
+      doc.setFillColor(99, 102, 241);
+      doc.roundedRect(margin - 5, yPosition - 5, maxWidth + 10, 35, 3, 3, "F");
+
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("Réponse finale", pageWidth / 2, yPosition + 8, { align: "center" });
+
+      doc.setFontSize(16);
+      doc.setFont("courier", "bold");
+      const answerLines = doc.splitTextToSize(finalAnswer, maxWidth - 20);
+      doc.text(answerLines, pageWidth / 2, yPosition + 22, { align: "center" });
+
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(150, 150, 150);
+        doc.text(
+          `Généré par MathSolver - Page ${i}/${pageCount}`,
+          pageWidth / 2,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: "center" }
+        );
+      }
+
+      // Save the PDF
+      const filename = `mathsolver-${new Date().toISOString().slice(0, 10)}.pdf`;
+      doc.save(filename);
+      toast.success("PDF téléchargé !");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Erreur lors de la génération du PDF");
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -42,6 +160,10 @@ export function SolutionDisplay({ problem, steps, finalAnswer }: SolutionDisplay
           <Button variant="glass" size="sm" onClick={handleCopy}>
             {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             {copied ? "Copié" : "Copier"}
+          </Button>
+          <Button variant="glass" size="sm" onClick={handleDownloadPDF} disabled={downloading}>
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            PDF
           </Button>
         </div>
       </div>
