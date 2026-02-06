@@ -1,0 +1,4 @@
+project_id = "fyuiginlmmtueaiuzuom"
+
+[functions.solve-math]
+verify_jwt = false
