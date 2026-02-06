@@ -26,6 +26,7 @@ Règles:
 - La réponse finale doit être concise et claire
 - Utilise des notations mathématiques standard (x², √, π, ∫, ∑, etc.)
 - Adapte le niveau d'explication au type de problème
+- Si une image est fournie, analyse-la attentivement pour extraire le problème mathématique
 - Réponds UNIQUEMENT avec le JSON, sans texte avant ou après`;
 
 serve(async (req) => {
@@ -34,11 +35,11 @@ serve(async (req) => {
   }
 
   try {
-    const { problem, category } = await req.json();
+    const { problem, category, image } = await req.json();
 
-    if (!problem) {
+    if (!problem && !image) {
       return new Response(
-        JSON.stringify({ error: "Le problème est requis" }),
+        JSON.stringify({ error: "Le problème ou une image est requis" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -49,7 +50,27 @@ serve(async (req) => {
     }
 
     const categoryContext = category ? `\nCatégorie: ${category}` : "";
-    const userMessage = `Résous ce problème mathématique:${categoryContext}\n\nProblème: ${problem}`;
+    
+    // Build the user message content
+    let userContent: any;
+    
+    if (image) {
+      // Image provided - use multimodal input
+      const textPart = problem 
+        ? `Résous ce problème mathématique visible dans l'image:${categoryContext}\n\nContexte additionnel: ${problem}`
+        : `Analyse cette image et résous le problème mathématique qu'elle contient:${categoryContext}`;
+      
+      userContent = [
+        { type: "text", text: textPart },
+        { 
+          type: "image_url", 
+          image_url: { url: image }
+        }
+      ];
+    } else {
+      // Text only
+      userContent = `Résous ce problème mathématique:${categoryContext}\n\nProblème: ${problem}`;
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -61,7 +82,7 @@ serve(async (req) => {
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userMessage },
+          { role: "user", content: userContent },
         ],
         temperature: 0.3,
       }),

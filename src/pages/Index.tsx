@@ -73,15 +73,15 @@ export default function Index() {
     setCurrentProblem(null);
   };
 
-  const handleSubmit = async (problem: string) => {
+  const handleSubmit = async (problem: string, image?: string) => {
     if (!selectedCategory) return;
 
     setIsLoading(true);
-    setCurrentProblem(problem);
+    setCurrentProblem(image ? "📷 Problème depuis image" : problem);
     setCurrentSolution(null);
 
     try {
-      const solution = await solveMathProblem(problem, selectedCategory);
+      const solution = await solveMathProblem(problem, selectedCategory, image);
       setCurrentSolution(solution);
 
       // Add to history

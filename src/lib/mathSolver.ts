@@ -11,9 +11,13 @@ interface Solution {
   finalAnswer: string;
 }
 
-export async function solveMathProblem(problem: string, category: string): Promise<Solution> {
+export async function solveMathProblem(
+  problem: string, 
+  category: string, 
+  image?: string
+): Promise<Solution> {
   const { data, error } = await supabase.functions.invoke('solve-math', {
-    body: { problem, category }
+    body: { problem, category, image }
   });
 
   if (error) {
